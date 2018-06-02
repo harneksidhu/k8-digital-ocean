@@ -1,0 +1,593 @@
+---
+- hosts: localhost
+  tasks:
+  - name: Store public ssh key
+    shell: cat keys/id_rsa.pub
+    register: public_key
+  - name: Store public ssh key in digital ocean
+    digital_ocean:
+      state: present
+      command: ssh
+      name: ansible_ssh_key
+      ssh_pub_key: "{{ public_key.stdout }}"
+      api_token: "{{ digital_ocean_api_token }}"
+      unique_name: yes
+    register: my_key
+  - name: Create controller-0
+    digital_ocean:
+        state: present
+        command: droplet
+        name: controller-0
+        private_networking: yes
+        api_token: "{{ digital_ocean_api_token }}"
+        size_id: 1gb
+        region_id: tor1
+        image_id: ubuntu-18-04-x64
+        unique_name: yes
+        ssh_key_ids: "{{ my_key.ssh_key.id }}"
+    register: controller0
+  - add_host: 
+      name: "{{ controller0.droplet.ip_address }}"
+      groups: 
+        - controller0
+        - controller
+        - cluster
+  - name: Create worker-0
+    digital_ocean:
+        state: present
+        command: droplet
+        name: worker-0
+        private_networking: yes
+        api_token: "{{ digital_ocean_api_token }}"
+        size_id: 1gb
+        region_id: tor1
+        image_id: ubuntu-18-04-x64
+        unique_name: yes
+        ssh_key_ids: "{{ my_key.ssh_key.id }}"
+    register: worker0
+  - add_host: 
+      name: "{{ worker0.droplet.ip_address }}"
+      groups: 
+        - worker0
+        - worker
+        - cluster
+  - name: Create worker-1
+    digital_ocean:
+        state: present
+        command: droplet
+        name: worker-1
+        private_networking: yes
+        api_token: "{{ digital_ocean_api_token }}"
+        size_id: 1gb
+        region_id: tor1
+        image_id: ubuntu-18-04-x64
+        unique_name: yes
+        ssh_key_ids: "{{ my_key.ssh_key.id }}"
+    register: worker1
+  - add_host: 
+      name: "{{ worker1.droplet.ip_address }}"
+      groups: 
+        - worker1
+        - worker
+        - cluster
+  - name: Create worker-2
+    digital_ocean:
+        state: present
+        command: droplet
+        name: worker-2
+        private_networking: yes
+        api_token: "{{ digital_ocean_api_token }}"
+        size_id: 1gb
+        region_id: tor1
+        image_id: ubuntu-18-04-x64
+        unique_name: yes
+        ssh_key_ids: "{{ my_key.ssh_key.id }}"
+    register: worker2
+  - add_host: 
+      name: "{{ worker2.droplet.ip_address }}"
+      groups: 
+        - worker2
+        - worker
+        - cluster
+  - pause: seconds=60
+
+# # Create certificates
+# - hosts: localhost
+#   tasks:
+#   - name: Generate Certificate Authority
+#     shell: cfssl gencert -initca ca-csr.json | cfssljson -bare artifacts/ca
+#     args:
+#       chdir: files/
+
+#   - name: Generate Admin Client Certificate
+#     shell: cfssl gencert -ca=artifacts/ca.pem -ca-key=artifacts/ca-key.pem -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare artifacts/admin
+#     args:
+#       chdir: files/
+
+#   - name: Generate Kubelet Client Certificates
+#     shell: cfssl gencert \
+#           -ca=artifacts/ca.pem \
+#           -ca-key=artifacts/ca-key.pem \
+#           -config=ca-config.json \
+#           -hostname="{{item.instance}}","{{item.external_ip}}","{{item.internal_ip}}" \
+#           -profile=kubernetes \
+#           "{{item.instance}}"-csr.json | cfssljson -bare artifacts/"{{item.instance}}"
+#     args:
+#       chdir: files/
+#     with_items:
+#        - { instance: 'worker-0', external_ip: "{{worker0.droplet.ip_address}}", internal_ip: "{{worker0.droplet.networks.v4[1].ip_address}}" }
+#        - { instance: 'worker-1', external_ip: "{{worker1.droplet.ip_address}}", internal_ip: "{{worker1.droplet.networks.v4[1].ip_address}}" }
+#        - { instance: 'worker-2', external_ip: "{{worker2.droplet.ip_address}}", internal_ip: "{{worker2.droplet.networks.v4[1].ip_address}}" }
+
+#   - name: Generate Controller Manager Client Certificate
+#     shell: cfssl gencert \
+#            -ca=artifacts/ca.pem \
+#            -ca-key=artifacts/ca-key.pem \
+#            -config=ca-config.json \
+#            -profile=kubernetes \
+#            kube-controller-manager-csr.json | cfssljson -bare artifacts/kube-controller-manager
+#     args:
+#       chdir: files/
+
+#   - name: Generate Kube Proxy Client Certificate
+#     shell: cfssl gencert \
+#            -ca=artifacts/ca.pem \
+#            -ca-key=artifacts/ca-key.pem \
+#            -config=ca-config.json \
+#            -profile=kubernetes \
+#            kube-proxy-csr.json | cfssljson -bare artifacts/kube-proxy
+#     args:
+#       chdir: files/
+
+#   - name: Generate Scheduler Client Certificate
+#     shell: cfssl gencert \
+#            -ca=artifacts/ca.pem \
+#            -ca-key=artifacts/ca-key.pem \
+#            -config=ca-config.json \
+#            -profile=kubernetes \
+#            kube-scheduler-csr.json | cfssljson -bare artifacts/kube-scheduler
+#     args:
+#       chdir: files/
+
+#   - name: Generate Kubernetes API Server Certificate
+#     shell: cfssl gencert \
+#            -ca=artifacts/ca.pem \
+#            -ca-key=artifacts/ca-key.pem \
+#            -config=ca-config.json \
+#            -hostname="{{controller0.droplet.ip_address}}","{{controller0.droplet.networks.v4[1].ip_address}}",127.0.0.1,kubernetes.default \
+#            -profile=kubernetes \
+#            kubernetes-csr.json | cfssljson -bare artifacts/kubernetes
+#     args:
+#       chdir: files/
+  
+#   - name: Generate Service Account Key Pair
+#     shell: cfssl gencert \
+#             -ca=artifacts/ca.pem \
+#             -ca-key=artifacts/ca-key.pem \
+#             -config=ca-config.json \
+#             -profile=kubernetes \
+#             service-account-csr.json | cfssljson -bare artifacts/service-account
+#     args:
+#       chdir: files/
+
+# # Create Kubernetes Configuration File
+#   - name: Set cluster in kubectrl
+#     shell: kubectl config set-cluster k8 \
+#             --certificate-authority=artifacts/ca.pem \
+#             --embed-certs=true \
+#             --server=https://"{{controller0.droplet.ip_address}}":6443 \
+#             --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#     args:
+#       chdir: files/
+#     with_items:
+#        - { instance: 'worker-0' }
+#        - { instance: 'worker-1' }
+#        - { instance: 'worker-2' }
+
+#   - name: Set set-credentials in kubectrl
+#     shell: kubectl config set-credentials system:node:"{{item.instance}}" \
+#             --client-certificate=artifacts/"{{item.instance}}".pem \
+#             --client-key=artifacts/"{{item.instance}}"-key.pem \
+#             --embed-certs=true \
+#             --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#     args:
+#       chdir: files/
+#     with_items:
+#        - { instance: 'worker-0' }
+#        - { instance: 'worker-1' }
+#        - { instance: 'worker-2' }
+
+#   - name: Set set-context in kubectrl
+#     shell: kubectl config set-context default \
+#             --cluster=k8 \
+#             --user=system:node:"{{item.instance}}" \
+#             --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#     args:
+#       chdir: files/
+#     with_items:
+#        - { instance: 'worker-0' }
+#        - { instance: 'worker-1' }
+#        - { instance: 'worker-2' }
+  
+#   - name: use-context in kubectrl
+#     shell: kubectl config use-context default --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#     args:
+#       chdir: files/
+#     with_items:
+#        - { instance: 'worker-0' }
+#        - { instance: 'worker-1' }
+#        - { instance: 'worker-2' }
+
+# # Create Kubernetes Proxy File
+#   - name: Generate a kubeconfig file for the kube-proxy service
+#     shell: kubectl config set-cluster k8 \
+#             --certificate-authority=artifacts/ca.pem \
+#             --embed-certs=true \
+#             --server=https://"{{controller0.droplet.ip_address}}":6443 \
+#             --kubeconfig=artifacts/kube-proxy.kubeconfig &&
+#            kubectl config set-credentials system:kube-proxy \
+#             --client-certificate=artifacts/kube-proxy.pem \
+#             --client-key=artifacts/kube-proxy-key.pem \
+#             --embed-certs=true \
+#             --kubeconfig=artifacts/kube-proxy.kubeconfig &&
+#            kubectl config set-context default \
+#             --cluster=k8 \
+#             --user=system:kube-proxy \
+#             --kubeconfig=artifacts/kube-proxy.kubeconfig &&
+#            kubectl config use-context default --kubeconfig=artifacts/kube-proxy.kubeconfig
+#     args:
+#       chdir: files/
+
+# # Create Kubernetes controller manager config File
+#   - name: Generate a kube-controller-manager Kubernetes Configuration File
+#     shell: kubectl config set-cluster k8 \
+#             --certificate-authority=artifacts/ca.pem \
+#             --embed-certs=true \
+#             --server=https://127.0.0.1:6443 \
+#             --kubeconfig=artifacts/kube-controller-manager.kubeconfig &&
+#            kubectl config set-credentials system:kube-controller-manager \
+#             --client-certificate=artifacts/kube-controller-manager.pem \
+#             --client-key=artifacts/kube-controller-manager-key.pem \
+#             --embed-certs=true \
+#             --kubeconfig=artifacts/kube-controller-manager.kubeconfig &&
+#            kubectl config set-context default \
+#             --cluster=k8 \
+#             --user=system:kube-controller-manager \
+#             --kubeconfig=artifacts/kube-controller-manager.kubeconfig &&
+#            kubectl config use-context default --kubeconfig=artifacts/kube-controller-manager.kubeconfig
+#     args:
+#       chdir: files/
+
+# # Create kube-scheduler Kubernetes Configuration File
+#   - name: Generate a kube-scheduler Kubernetes Configuration File
+#     shell: kubectl config set-cluster k8 \
+#             --certificate-authority=artifacts/ca.pem \
+#             --embed-certs=true \
+#             --server=https://127.0.0.1:6443 \
+#             --kubeconfig=artifacts/kube-scheduler.kubeconfig &&
+#            kubectl config set-credentials system:kube-scheduler \
+#             --client-certificate=artifacts/kube-scheduler.pem \
+#             --client-key=artifacts/kube-scheduler-key.pem \
+#             --embed-certs=true \
+#             --kubeconfig=artifacts/kube-scheduler.kubeconfig &&
+#            kubectl config set-context default \
+#             --cluster=k8 \
+#             --user=system:kube-scheduler \
+#             --kubeconfig=artifacts/kube-scheduler.kubeconfig &&
+#            kubectl config use-context default --kubeconfig=artifacts/kube-scheduler.kubeconfig
+#     args:
+#       chdir: files/
+
+# # Create Kubernetes Admin File
+#   - name: Generate a admin kubeconfig file
+#     shell: kubectl config set-cluster k8 \
+#             --certificate-authority=artifacts/ca.pem \
+#             --embed-certs=true \
+#             --server=https://127.0.0.1:6443 \
+#             --kubeconfig=artifacts/admin.kubeconfig &&
+#            kubectl config set-credentials admin \
+#             --client-certificate=artifacts/admin.pem \
+#             --client-key=artifacts/admin-key.pem \
+#             --embed-certs=true \
+#             --kubeconfig=artifacts/admin.kubeconfig &&
+#            kubectl config set-context default \
+#             --cluster=k8 \
+#             --user=admin \
+#             --kubeconfig=artifacts/admin.kubeconfig &&
+#            kubectl config use-context default --kubeconfig=artifacts/admin.kubeconfig
+#     args:
+#       chdir: files/
+
+# #Install python2 on all machines
+
+# - hosts: cluster
+#   remote_user: root
+#   gather_facts: no
+#   tasks:
+#   - name: Install python
+#     raw: apt-get -y install python-minimal
+
+
+# #Copy appropriate certificates and private keys to each worker instance
+
+# - hosts: worker
+#   strategy: free
+#   remote_user: root
+#   tasks:
+#   - name: Copy artifacts to workers
+#     copy:
+#       src: "{{item.src}}"
+#       dest: ~/
+#     with_items:
+#       - { src: 'artifacts/ca.pem' }
+#       - { src: 'artifacts/kube-proxy.kubeconfig' }
+
+# - hosts: worker0
+#   remote_user: root
+#   tasks:
+#   - name: Copy artifacts to worker-0
+#     copy:
+#       src: "{{item.src}}"
+#       dest: ~/
+#     with_items:
+#       - {src: 'artifacts/worker-0-key.pem'}
+#       - {src: 'artifacts/worker-0.pem'}
+#       - {src: 'artifacts/worker-0.kubeconfig'}
+
+# - hosts: worker1
+#   remote_user: root
+#   tasks:
+#   - name: Copy artifacts to worker-1
+#     copy:
+#       src: "{{item.src}}"
+#       dest: ~/
+#     with_items:
+#       - {src: 'artifacts/worker-1-key.pem'}
+#       - {src: 'artifacts/worker-1.pem'}
+#       - {src: 'artifacts/worker-1.kubeconfig'}
+
+# - hosts: worker2
+#   remote_user: root
+#   tasks:
+#   - name: Copy artifacts to worker-2
+#     copy:
+#       src: "{{item.src}}"
+#       dest: ~/
+#     with_items:
+#       - {src: 'artifacts/worker-2-key.pem'}
+#       - {src: 'artifacts/worker-2.pem'}
+#       - {src: 'artifacts/worker-2.kubeconfig'}
+
+# #Copy appropriate certificates and private keys to each controller instance
+
+# - hosts: controller
+#   remote_user: root
+#   tasks: 
+#     - name: Install pip
+#       apt: 
+#         name: python-pip
+#         state: present
+#     - name: Install packages required for k8s_raw
+#       pip: 
+#         name: "{{item.name}}"
+#         version: "{{item.version}}"
+#       with_items: 
+#         - {name: 'openshift', version: '0.4.3'}
+#         - {name: 'PyYAML', version: '3.11'}
+#     - name: Copy appropriate certificates and private keys to each controller instance
+#       copy:
+#         src: "{{ item.src }}"
+#         dest: ~/
+#       with_items:
+#         - { src: 'artifacts/ca.pem' }
+#         - { src: 'artifacts/ca-key.pem' }
+#         - { src: 'artifacts/kubernetes-key.pem' }
+#         - { src: 'artifacts/kubernetes.pem' }
+#         - { src: 'artifacts/admin.kubeconfig'}
+#         - { src: 'artifacts/kube-controller-manager.kubeconfig'}
+#         - { src: 'artifacts/kube-scheduler.kubeconfig'}
+#         - { src: 'encryption-config.yaml'}
+#         - { src: 'artifacts/service-account-key.pem'}
+#         - { src: 'artifacts/service-account.pem'}
+#         - { src: 'kube-apiserver-to-kubelet-bind.yml'}
+#         - { src: 'kube-apiserver-to-kubelet.yml'}
+#     - name: Unarchive a file that needs to be downloaded (added in 2.0)
+#       unarchive:
+#         src: https://github.com/coreos/etcd/releases/download/v3.3.5/etcd-v3.3.5-linux-amd64.tar.gz
+#         dest: ~/
+#         remote_src: yes
+#     - name: Copy etcd to bin folder
+#       copy:
+#         src: ~/etcd-v3.3.5-linux-amd64/etcd
+#         dest: /usr/local/bin/
+#         remote_src: yes
+#         mode: +x
+#     - name: Copy etcdctl to bin folder
+#       copy:
+#         src: ~/etcd-v3.3.5-linux-amd64/etcdctl
+#         dest: /usr/local/bin/
+#         remote_src: yes
+#         mode: +x
+#     - name: Create etcd directory
+#       file: path=/etc/etcd state=directory
+#     - name: Copy etcd certificates
+#       copy:
+#         src: "{{ item.src }}"
+#         dest: /etc/etcd/
+#         remote_src: yes
+#         mode: 777
+#       with_items:
+#         - { src: '~/ca.pem' }
+#         - { src: '~/kubernetes-key.pem' }
+#         - { src: '~/kubernetes.pem' }
+#     - template:
+#         src: templates/etcd.service.j2
+#         dest: /etc/systemd/system/etcd.service
+#     - name: Create the Kubernetes configuration directory
+#       file: path=/etc/kubernetes/config state=directory
+#     - name: Download and Install the Kubernetes Controller Binaries
+#       get_url:
+#         url: "{{ item.src }}"
+#         dest: /usr/local/bin/
+#         mode: 777
+#       with_items:
+#         - { src: 'https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kube-apiserver' }
+#         - { src: 'https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kube-controller-manager' }
+#         - { src: 'https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kube-scheduler' }
+#         - { src: 'https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubectl' }
+#     - name: Create kubernetes api server directory
+#       file: path=/var/lib/kubernetes state=directory
+#     - name: Move Kubernetes API artifacts
+#       copy:
+#         src: "{{ item.src }}"
+#         dest: /var/lib/kubernetes/
+#         remote_src: yes
+#         mode: 777
+#       with_items:
+#         - { src: '~/ca.pem' }
+#         - { src: '~/ca-key.pem' }
+#         - { src: '~/kubernetes-key.pem' }
+#         - { src: '~/kubernetes.pem' }
+#         - { src: '~/service-account-key.pem' }
+#         - { src: '~/service-account.pem' }
+#         - { src: '~/encryption-config.yaml' }
+#         - { src: '~/kube-controller-manager.kubeconfig' }
+#         - { src: '~/kube-scheduler.kubeconfig' }
+#     - name: Upload kube-apiserver.service
+#       template:
+#         src: templates/kube-apiserver.service.j2
+#         dest: /etc/systemd/system/kube-apiserver.service
+#     - name: Upload kube-controller-manager.service
+#       template:
+#         src: templates/kube-controller-manager.service.j2
+#         dest: /etc/systemd/system/kube-controller-manager.service
+#     - name: Upload kube-scheduler.yaml
+#       template:
+#         src: templates/kube-scheduler.yaml.j2
+#         dest: /etc/kubernetes/config/kube-scheduler.yaml
+#     - name: Upload kube-scheduler.service
+#       template:
+#         src: templates/kube-scheduler.service.j2
+#         dest: /etc/systemd/system/kube-scheduler.service
+#     - name: Install nginx
+#       apt: 
+#         name: nginx
+#         state: present
+#     - name: Upload kubernetes.default.svc.cluster.local
+#       template:
+#         src: templates/kubernetes.default.svc.cluster.local.j2
+#         dest: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+#     - name: Create symbolic link for nginx file
+#       file:
+#         state: link
+#         src: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+#         dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
+    # - name: Reload systemd daemon
+    #   systemd:
+    #     daemon_reload: yes
+    # - name: enable services
+    #   systemd:
+    #     name: "{{ item.service }}"
+    #     enabled: yes
+    #     masked: no
+    #   with_items:
+    #     - { service: 'etcd' }
+    #     - { service: 'kube-apiserver' }
+    #     - { service: 'kube-controller-manager' }
+    #     - { service: 'kube-scheduler' }
+    #     - { service: 'nginx' }
+    # - name: Restart services
+    #   systemd: 
+    #     state: restarted
+    #     name: "{{ item.service }}"
+    #   with_items:
+    #     - { service: 'etcd' }
+    #     - { service: 'kube-apiserver' }
+    #     - { service: 'kube-controller-manager' }
+    #     - { service: 'kube-scheduler' }
+    #     - { service: 'nginx' }
+#     - name: Create a ClusterRole
+#       shell: kubectl apply --kubeconfig admin.kubeconfig -f kube-apiserver-to-kubelet.yml
+#       args:
+#         chdir: ~/
+#     - name: Bind the ClusterRole
+#       shell: kubectl apply --kubeconfig admin.kubeconfig -f kube-apiserver-to-kubelet-bind.yml
+#       args:
+#         chdir: ~/
+
+- hosts: worker
+  remote_user: root
+  strategy: free
+  tasks: 
+    - name: Create directories
+      file: 
+        path: "{{ item.path }}"
+        state: directory
+      with_items:
+        - { path: '/opt/cni/bin/' }
+        - { path: '/etc/cni/net.d/' }
+        - { path: '/etc/containerd/' }
+        - { path: '/var/lib/kubelet/' }
+        - { path: '/var/lib/kube-proxy/' }
+        - { path: '/var/lib/kubernetes/' }
+    - name: Download and Install Worker Binaries
+      get_url:
+        url: "{{ item.src }}"
+        dest: /usr/local/bin/{{ item.file_name }}
+        mode: 777
+      with_items:
+        - { src: 'https://storage.googleapis.com/kubernetes-the-hard-way/runsc', file_name: runsc }
+        - { src: 'https://github.com/opencontainers/runc/releases/download/v1.0.0-rc5/runc.amd64', file_name: runc }
+        - { src: 'https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubectl', file_name: kubectl }
+        - { src: 'https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kube-proxy', file_name: kube-proxy }
+        - { src: 'https://storage.googleapis.com/kubernetes-release/release/v1.10.2/bin/linux/amd64/kubelet', file_name: kubelet }
+    - name: Download, Extract, and Install Worker Binaries
+      unarchive:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        remote_src: yes
+      with_items:
+        - { src: 'https://github.com/kubernetes-incubator/cri-tools/releases/download/v1.0.0-beta.0/crictl-v1.0.0-beta.0-linux-amd64.tar.gz', dest: '/usr/local/bin/' }
+        - { src: 'https://github.com/containernetworking/plugins/releases/download/v0.6.0/cni-plugins-amd64-v0.6.0.tgz', dest: '/opt/cni/bin/' }
+        - { src: 'https://github.com/containerd/containerd/releases/download/v1.1.0/containerd-1.1.0.linux-amd64.tar.gz', dest: '/' }
+    - name: Copy worker artifacts
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+      with_items:
+        - { src: '10-bridge.conf', dest: '/etc/cni/net.d/10-bridge.conf' }
+        - { src: '99-loopback.conf', dest: '/etc/cni/net.d/99-loopback.conf' }
+        - { src: 'config.toml', dest: '/etc/containerd/config.toml' }
+        - { src: 'containerd.service', dest: '/etc/systemd/system/containerd.service' }
+        - { src: 'kubelet.service', dest: '/etc/systemd/system/kubelet.service' }
+        - { src: 'artifacts/kube-proxy.kubeconfig', dest: '/var/lib/kube-proxy/kubeconfig' }  # TODO: change if broken
+        - { src: 'kube-proxy-config.yaml', dest: '/var/lib/kube-proxy/kube-proxy-config.yaml' }
+        - { src: 'kube-proxy.service', dest: '/etc/systemd/system/kube-proxy.service' }
+        - { src: 'artifacts/{{ ansible_nodename }}-key.pem', dest: '/var/lib/kubelet/{{ ansible_nodename }}-key.pem' }
+        - { src: 'artifacts/{{ ansible_nodename }}.pem', dest: '/var/lib/kubelet/{{ ansible_nodename }}.pem' }
+        - { src: 'artifacts/{{ ansible_nodename }}.kubeconfig', dest: '/var/lib/kubelet/kubeconfig' }
+        - { src: 'artifacts/ca.pem', dest: '/var/lib/kubernetes/ca.pem' }
+    - name: Copy template artifacts
+      template:
+        src: templates/kubelet-config.yaml.j2
+        dest: /var/lib/kubelet/kubelet-config.yaml
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+    - name: enable services
+      systemd:
+        name: "{{ item.service }}"
+        enabled: yes
+        masked: no
+      with_items:
+        - { service: 'containerd' }
+        - { service: 'kubelet' }
+        - { service: 'kube-proxy' }
+    - name: Restart services
+      systemd: 
+        state: restarted
+        name: "{{ item.service }}"
+      with_items:
+        - { service: 'containerd' }
+        - { service: 'kubelet' }
+        - { service: 'kube-proxy' }

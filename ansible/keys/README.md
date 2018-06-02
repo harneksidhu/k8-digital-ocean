@@ -1,0 +1,1 @@
+This directory will store the public/private ssh keys required for the demo to work.
