@@ -1,0 +1,6 @@
+**/id_rsa
+**/id_rsa.pub
+**/.DS_Store
+**/.terraform
+terraform/secrets/production.tfvars
+terraform/terraform.tfplan
