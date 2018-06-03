@@ -4,3 +4,5 @@
 **/.terraform
 terraform/secrets/production.tfvars
 terraform/terraform.tfplan
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup

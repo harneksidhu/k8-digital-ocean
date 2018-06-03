@@ -8,6 +8,7 @@ resource "digitalocean_droplet" "controller" {
     ssh_keys = [
       "${var.ssh_fingerprint}"
     ]
+    tags = ["controller"]
 
     connection {
         user = "root"

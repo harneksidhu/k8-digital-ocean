@@ -16,13 +16,16 @@ terraform apply \
 Create this file in `terraform/secrets/production.tfvars`
 ```
 do_token=
-pub_key="keys/id_rsa.pub"
-pvt_key="keys/id_rsa"
+pub_key="secrets/id_rsa.pub"
+pvt_key="secrets/id_rsa"
 ssh_fingerprint=
 ```
 
+`export DO_API_TOKEN=` for ansible's dynamic inventory
+
 ## Tips
 ssh_fingerprint can be obtained using `ssh-keygen -E md5 -lf id_rsa.pub | awk '{print $2}'`
+`ansible -i digital_ocean.py all -m ping`
 
 ## Resources
 https://www.digitalocean.com/community/tutorials/how-to-use-terraform-with-digitalocean
