@@ -1,3 +1,7 @@
+resource "digitalocean_tag" "controller" {
+  name = "controller"
+}
+
 resource "digitalocean_droplet" "controller" {
     count = 3
     image = "ubuntu-18-04-x64"
@@ -8,7 +12,7 @@ resource "digitalocean_droplet" "controller" {
     ssh_keys = [
       "${var.ssh_fingerprint}"
     ]
-    tags = ["controller"]
+    tags = ["${digitalocean_tag.controller.id}"]
 
     connection {
         user = "root"
