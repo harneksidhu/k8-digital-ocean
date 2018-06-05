@@ -1,5 +1,8 @@
 # k8-digital-ocean
 
+Pre-requisites
+Install `cfssl` and `cfssljson` from `https://pkg.cfssl.org/` on local machine.
+
 
 Run the following in `terraform/`
 

@@ -1,0 +1,237 @@
+- name: Create artifacts directory
+  file: 
+    path: '{{ playbook_dir }}/artifacts'
+    state: directory
+
+- name: Check existing ca files
+  stat:
+    path: '{{ playbook_dir }}/artifacts/{{ item }}'
+  with_items: 
+  - 'ca-key.pem'
+  - 'ca.csr'
+  - 'ca.pem'
+  register: ca_stat
+
+- name: Generate Certificate Authority
+  shell: cfssl gencert -initca ca-csr.json | cfssljson -bare '{{ playbook_dir }}/artifacts/ca'
+  args:
+    chdir: '{{ role_path }}/files'
+  when: ca_stat.results | selectattr('stat.exists') | list | length < 3
+  register: authority_certs
+
+- name: Check existing admin files
+  stat:
+    path: '{{ playbook_dir }}/artifacts/{{ item }}'
+  with_items: 
+  - 'admin-key.pem'
+  - 'admin.pem'
+  register: admin_stat
+
+- name: Generate Admin Client Certificate
+  shell: cfssl gencert -ca='{{ playbook_dir }}/artifacts/ca.pem' -ca-key='{{ playbook_dir }}/artifacts/ca-key.pem' -config=ca-config.json -profile=kubernetes admin-csr.json | cfssljson -bare '{{ playbook_dir }}/artifacts/admin'
+  args:
+    chdir: '{{ role_path }}/files'
+  when: authority_certs.changed or
+        admin_stat.results | selectattr('stat.exists') | list | length < 2
+
+
+- name: the final countdown
+  debug: 
+    msg: '{{ item }} seconds to detonation'
+  with_sequence: start=1 end='{{ workers }}' format=worker-%01x
+
+# - name: Generate Kubelet Client Certificates
+#   shell: cfssl gencert \
+#         -ca=artifacts/ca.pem \
+#         -ca-key=artifacts/ca-key.pem \
+#         -config=ca-config.json \
+#         -hostname="{{item.instance}}","{{item.external_ip}}","{{item.internal_ip}}" \
+#         -profile=kubernetes \
+#         "{{item.instance}}"-csr.json | cfssljson -bare artifacts/"{{item.instance}}"
+#   args:
+#     chdir: files/
+#   with_items:
+#      - { instance: 'worker-0', external_ip: "{{worker0.droplet.ip_address}}", internal_ip: "{{worker0.droplet.networks.v4[1].ip_address}}" }
+#      - { instance: 'worker-1', external_ip: "{{worker1.droplet.ip_address}}", internal_ip: "{{worker1.droplet.networks.v4[1].ip_address}}" }
+#      - { instance: 'worker-2', external_ip: "{{worker2.droplet.ip_address}}", internal_ip: "{{worker2.droplet.networks.v4[1].ip_address}}" }
+#   with_sequence: start=1 end='{{ workers }}' format=worker-%01x
+
+
+# - name: Generate Controller Manager Client Certificate
+#   shell: cfssl gencert \
+#          -ca=artifacts/ca.pem \
+#          -ca-key=artifacts/ca-key.pem \
+#          -config=ca-config.json \
+#          -profile=kubernetes \
+#          kube-controller-manager-csr.json | cfssljson -bare artifacts/kube-controller-manager
+#   args:
+#     chdir: files/
+
+# - name: Generate Kube Proxy Client Certificate
+#   shell: cfssl gencert \
+#          -ca=artifacts/ca.pem \
+#          -ca-key=artifacts/ca-key.pem \
+#          -config=ca-config.json \
+#          -profile=kubernetes \
+#          kube-proxy-csr.json | cfssljson -bare artifacts/kube-proxy
+#   args:
+#     chdir: files/
+
+# - name: Generate Scheduler Client Certificate
+#   shell: cfssl gencert \
+#          -ca=artifacts/ca.pem \
+#          -ca-key=artifacts/ca-key.pem \
+#          -config=ca-config.json \
+#          -profile=kubernetes \
+#          kube-scheduler-csr.json | cfssljson -bare artifacts/kube-scheduler
+#   args:
+#     chdir: files/
+
+# - name: Generate Kubernetes API Server Certificate
+#   shell: cfssl gencert \
+#          -ca=artifacts/ca.pem \
+#          -ca-key=artifacts/ca-key.pem \
+#          -config=ca-config.json \
+#          -hostname="{{controller0.droplet.ip_address}}","{{controller0.droplet.networks.v4[1].ip_address}}",127.0.0.1,kubernetes.default \
+#          -profile=kubernetes \
+#          kubernetes-csr.json | cfssljson -bare artifacts/kubernetes
+#   args:
+#     chdir: files/
+
+# - name: Generate Service Account Key Pair
+#   shell: cfssl gencert \
+#           -ca=artifacts/ca.pem \
+#           -ca-key=artifacts/ca-key.pem \
+#           -config=ca-config.json \
+#           -profile=kubernetes \
+#           service-account-csr.json | cfssljson -bare artifacts/service-account
+#   args:
+#     chdir: files/
+
+# # Create Kubernetes Configuration File
+# - name: Set cluster in kubectrl
+#   shell: kubectl config set-cluster k8 \
+#           --certificate-authority=artifacts/ca.pem \
+#           --embed-certs=true \
+#           --server=https://"{{controller0.droplet.ip_address}}":6443 \
+#           --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#   args:
+#     chdir: files/
+#   with_items:
+#      - { instance: 'worker-0' }
+#      - { instance: 'worker-1' }
+#      - { instance: 'worker-2' }
+
+# - name: Set set-credentials in kubectrl
+#   shell: kubectl config set-credentials system:node:"{{item.instance}}" \
+#           --client-certificate=artifacts/"{{item.instance}}".pem \
+#           --client-key=artifacts/"{{item.instance}}"-key.pem \
+#           --embed-certs=true \
+#           --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#   args:
+#     chdir: files/
+#   with_items:
+#      - { instance: 'worker-0' }
+#      - { instance: 'worker-1' }
+#      - { instance: 'worker-2' }
+
+# - name: Set set-context in kubectrl
+#   shell: kubectl config set-context default \
+#           --cluster=k8 \
+#           --user=system:node:"{{item.instance}}" \
+#           --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#   args:
+#     chdir: files/
+#   with_items:
+#      - { instance: 'worker-0' }
+#      - { instance: 'worker-1' }
+#      - { instance: 'worker-2' }
+
+# - name: use-context in kubectrl
+#   shell: kubectl config use-context default --kubeconfig=artifacts/"{{item.instance}}".kubeconfig
+#   args:
+#     chdir: files/
+#   with_items:
+#      - { instance: 'worker-0' }
+#      - { instance: 'worker-1' }
+#      - { instance: 'worker-2' }
+
+# # Create Kubernetes Proxy File
+# - name: Generate a kubeconfig file for the kube-proxy service
+#   shell: kubectl config set-cluster k8 \
+#           --certificate-authority=artifacts/ca.pem \
+#           --embed-certs=true \
+#           --server=https://"{{controller0.droplet.ip_address}}":6443 \
+#           --kubeconfig=artifacts/kube-proxy.kubeconfig &&
+#          kubectl config set-credentials system:kube-proxy \
+#           --client-certificate=artifacts/kube-proxy.pem \
+#           --client-key=artifacts/kube-proxy-key.pem \
+#           --embed-certs=true \
+#           --kubeconfig=artifacts/kube-proxy.kubeconfig &&
+#          kubectl config set-context default \
+#           --cluster=k8 \
+#           --user=system:kube-proxy \
+#           --kubeconfig=artifacts/kube-proxy.kubeconfig &&
+#          kubectl config use-context default --kubeconfig=artifacts/kube-proxy.kubeconfig
+#   args:
+#     chdir: files/
+
+# # Create Kubernetes controller manager config File
+# - name: Generate a kube-controller-manager Kubernetes Configuration File
+#   shell: kubectl config set-cluster k8 \
+#           --certificate-authority=artifacts/ca.pem \
+#           --embed-certs=true \
+#           --server=https://127.0.0.1:6443 \
+#           --kubeconfig=artifacts/kube-controller-manager.kubeconfig &&
+#          kubectl config set-credentials system:kube-controller-manager \
+#           --client-certificate=artifacts/kube-controller-manager.pem \
+#           --client-key=artifacts/kube-controller-manager-key.pem \
+#           --embed-certs=true \
+#           --kubeconfig=artifacts/kube-controller-manager.kubeconfig &&
+#          kubectl config set-context default \
+#           --cluster=k8 \
+#           --user=system:kube-controller-manager \
+#           --kubeconfig=artifacts/kube-controller-manager.kubeconfig &&
+#          kubectl config use-context default --kubeconfig=artifacts/kube-controller-manager.kubeconfig
+#   args:
+#     chdir: files/
+
+# # Create kube-scheduler Kubernetes Configuration File
+# - name: Generate a kube-scheduler Kubernetes Configuration File
+#   shell: kubectl config set-cluster k8 \
+#           --certificate-authority=artifacts/ca.pem \
+#           --embed-certs=true \
+#           --server=https://127.0.0.1:6443 \
+#           --kubeconfig=artifacts/kube-scheduler.kubeconfig &&
+#          kubectl config set-credentials system:kube-scheduler \
+#           --client-certificate=artifacts/kube-scheduler.pem \
+#           --client-key=artifacts/kube-scheduler-key.pem \
+#           --embed-certs=true \
+#           --kubeconfig=artifacts/kube-scheduler.kubeconfig &&
+#          kubectl config set-context default \
+#           --cluster=k8 \
+#           --user=system:kube-scheduler \
+#           --kubeconfig=artifacts/kube-scheduler.kubeconfig &&
+#          kubectl config use-context default --kubeconfig=artifacts/kube-scheduler.kubeconfig
+#   args:
+#     chdir: files/
+
+# # Create Kubernetes Admin File
+# - name: Generate a admin kubeconfig file
+#   shell: kubectl config set-cluster k8 \
+#           --certificate-authority=artifacts/ca.pem \
+#           --embed-certs=true \
+#           --server=https://127.0.0.1:6443 \
+#           --kubeconfig=artifacts/admin.kubeconfig &&
+#          kubectl config set-credentials admin \
+#           --client-certificate=artifacts/admin.pem \
+#           --client-key=artifacts/admin-key.pem \
+#           --embed-certs=true \
+#           --kubeconfig=artifacts/admin.kubeconfig &&
+#          kubectl config set-context default \
+#           --cluster=k8 \
+#           --user=admin \
+#           --kubeconfig=artifacts/admin.kubeconfig &&
+#          kubectl config use-context default --kubeconfig=artifacts/admin.kubeconfig
+#   args:
+#     chdir: files/
